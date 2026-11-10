@@ -1,0 +1,6 @@
+nfl-big-data-bowl-regional-event-data-main/
+*.zip
+output/cache/
+output/race_routes.csv
+output/compute_log.txt
+__pycache__/

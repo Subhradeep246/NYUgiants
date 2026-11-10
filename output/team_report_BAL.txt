@@ -1,0 +1,53 @@
+
+VALIDATION (receiver level) - did the TARGETED receiver win his race?
+                            outcome  targets  p_complete  p_int  yards_when_complete
+target was open before pocket broke      829       0.727    0.0               13.166
+        target was NOT open in time      461       0.603    0.0               14.655
+                target margin: lost       97       0.763    0.0               13.784
+               target margin: <0.3s      141       0.745    0.0               11.638
+            target margin: 0.3-0.6s      111       0.802    0.0                9.674
+            target margin: 0.6-1.0s      269       0.729    0.0               12.612
+               target margin: >1.0s      331       0.680    0.0               15.756
+
+VALIDATION - does winning the race matter? (pressured dropbacks)
+                                    outcome  dropbacks  p_complete  p_sack  p_int  yards_per_play  success_rate
+race won (someone open before pocket broke)       2359       0.348   0.195  0.024           4.075         0.327
+            race lost (nobody open in time)        136       0.309   0.228  0.015           4.882         0.353
+                               margin: lost         57       0.368   0.298  0.000           5.737         0.439
+                       margin: won by <0.3s         76       0.316   0.263  0.013           2.158         0.342
+                           margin: 0.3-0.6s        146       0.329   0.253  0.021           3.274         0.336
+                           margin: 0.6-1.0s        714       0.359   0.216  0.020           3.626         0.324
+                              margin: >1.0s       1435       0.345   0.175  0.027           4.455         0.326
+
+LEAGUE protection exchange:
+offense cov_type  extra_blockers  dropbacks  pressure_rate  pocket_clock  receivers  first_open  open_in_time  race_won  completion  sack  yards  base_pocket_clock  base_first_open  base_race_won  base_completion  time_bought_s  route_clock_cost_s  race_won_change
+ LEAGUE      Man               0     1654.0           0.31           2.6       5.00         1.6          1.91      0.88        0.46  0.07   6.32                2.6              1.6           0.88             0.46            0.0                 0.0             0.00
+ LEAGUE      Man               1      602.0           0.35           2.5       3.98         1.6          1.64      0.83        0.48  0.08   6.62                2.6              1.6           0.88             0.46           -0.1                 0.0            -0.05
+ LEAGUE      Man               2      206.0           0.31           2.8       2.88         1.6          1.17      0.68        0.48  0.08   6.78                2.6              1.6           0.88             0.46            0.2                 0.0            -0.20
+ LEAGUE     Zone               0     4053.0           0.31           2.6       4.99         1.5          3.55      0.98        0.60  0.05   6.56                2.6              1.5           0.98             0.60            0.0                 0.0             0.00
+ LEAGUE     Zone               1     1050.0           0.35           2.8       3.98         1.5          2.99      0.98        0.54  0.08   7.56                2.6              1.5           0.98             0.60            0.2                 0.0            -0.01
+ LEAGUE     Zone               2      436.0           0.24           3.2       2.92         1.6          2.37      0.97        0.51  0.06   7.73                2.6              1.5           0.98             0.60            0.6                 0.1            -0.02
+
+==== RACE CARD: BAL ====
+
+OFFENSE - protection exchange (vs 5-man protection in same coverage):
+cov_type  extra_blockers  dropbacks  pocket_clock  first_open  race_won  completion  time_bought_s  route_clock_cost_s  race_won_change
+     Man               0       23.0          2.70         1.5      1.00        0.43           0.00                 0.0             0.00
+     Man               1       22.0          2.75         1.5      0.82        0.50           0.05                 0.0            -0.18
+    Zone               0      136.0          2.90         1.5      0.99        0.52           0.00                 0.0             0.00
+    Zone               1       59.0          3.10         1.5      1.00        0.49           0.20                 0.0             0.01
+    Zone               2       11.0          3.40         1.6      0.91        0.55           0.50                 0.1            -0.08
+
+DEFENSE - what opponents face:
+coverage  dropbacks  pressure_rate  pocket_clock  first_open  race_won_allowed  completion_allowed  sack_rate
+     ALL      250.0           0.29          2.70         1.6              0.90                0.56       0.06
+ Cover-0       21.0           0.24          2.60         1.6              0.81                0.52       0.00
+ Cover-1       78.0           0.22          2.70         1.6              0.85                0.51       0.05
+ Cover-2       16.0           0.44          2.30         1.5              0.88                0.38       0.19
+ Cover-3       75.0           0.32          2.70         1.6              1.00                0.52       0.08
+ Cover-6       34.0           0.29          2.60         1.6              0.94                0.71       0.00
+Quarters       19.0           0.32          2.95         1.5              1.00                0.84       0.00
+
+League: pressure 31%, pocket clock 2.7s, first open 1.6s, race won 94%
+
+wrote validation.csv, protection_exchange.csv, defense_cards.csv, chart_validation.png, chart_protection.png
