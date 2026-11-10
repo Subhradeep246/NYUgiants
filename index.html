@@ -1,25 +1,105 @@
-<!doctype html><html><head><meta charset="utf-8"><title>THE RACE · Pocket Clock vs Route Clock</title>
-<style>body{margin:0;background:#07090d;color:#f3f5f7;font-family:Inter,system-ui,Segoe UI,Roboto,sans-serif}.w{max-width:1100px;margin:0 auto;padding:28px 18px}
-.tag{color:#ffd166;font-weight:900;letter-spacing:.16em;font-size:12px}h1{font-size:34px;margin:6px 0 4px}p.lead{color:#9aa5b1;font-size:17px;max-width:820px}
-.kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:22px 0}.kpi div{background:#121820;border:1px solid #2a3340;border-radius:10px;padding:14px}.kpi b{display:block;font-size:30px;color:#2ee06f}.kpi span{color:#9aa5b1;font-size:13px}
-h2{margin:30px 0 10px;font-size:20px}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}.card{background:#121820;border:1px solid #2a3340;border-radius:10px;overflow:hidden}.card img{width:100%;display:block;background:#fff}.card div{padding:10px 12px;font-size:14px;color:#9aa5b1}
-a{color:#ffd166}.btn{display:inline-block;background:#ffd166;color:#07090d;font-weight:800;padding:10px 16px;border-radius:8px;text-decoration:none;margin:4px 8px 4px 0}.foot{color:#6b7480;font-size:12px;margin-top:30px}</style></head><body><div class="w">
-<div class="tag">NFL BIG DATA BOWL · NYU EDITION</div><h1>THE RACE — Pocket Clock vs. Route Clock</h1>
-<p class="lead">Every pass play is a race between two clocks: how fast the pass rush breaks the pocket, and how fast a receiver gets open. We measure both from Next Gen Stats tracking on every 2021 dropback and show who wins — per play, per receiver, per team.</p>
-<div class="kpi"><div><b>73% vs 60%</b><span>completion when the QB throws to a receiver who won the race vs one who hadn't (1,290 pressured targets)</span></div>
-<div><b>2.7 s / 1.8 s</b><span>median pocket clock vs median route clock</span></div>
-<div><b>30% → 17%</b><span>sack rate when nobody wins vs a receiver wins by &gt;1 s</span></div>
-<div><b>0.0 s</b><span>pocket time bought by an extra blocker vs man coverage (+0.6 s vs zone with two)</span></div></div>
-<h2>📺 Broadcast mock (click Lower-third, then Play)</h2>
-<a class="btn" href="output/race_tv_2021091209_3093.html">Mahomes → Hill, 75-yd TD</a>
-<a class="btn" href="output/race_tv_2021102401_562.html">Heinicke → McLaurin, 40-yd TD</a>
-<a class="btn" href="output/race_tv_2021090900_687.html">Prescott → Gallup (open man ignored)</a>
-<h2>📊 Charts</h2><div class="cards">
-<div class="card"><img src="output/chart_validation_target.png"><div>Validation — winning the race changes completion probability</div></div>
-<div class="card"><img src="output/chart_receivers.png"><div>Scout view — who gets open before the pocket breaks</div></div>
-<div class="card"><img src="output/chart_protection.png"><div>Coach view — the protection exchange rate</div></div>
-<div class="card"><img src="output/chart_teams.png"><div>Team sync — offenses that out-run their own protection</div></div>
-<div class="card"><img src="output/chart_positions.png"><div>By position — who has already won when the pocket breaks</div></div>
-<div class="card"><img src="output/chart_validation.png"><div>Play level — completion and sack rate by race margin</div></div></div>
-<h2>Code &amp; README</h2><p class="lead">All Python, runs end to end on the public Big Data Bowl data: <code>compute_race.py → make_charts.py → race_tv.py → team_report.py → race_commentary.py</code>. See the <a href="README.md">README</a> for method, findings and limitations.</p>
-<div class="foot">Data: NFL Next Gen Stats + PFF (2021 weeks 1–8), via the Big Data Bowl. Matchups inferred as nearest defender; thresholds 2 yds pressure, 3 yds open, 5 yd stem.</div></div></body></html>
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>THE RACE · Pocket Clock vs Route Clock</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#fafaf9;--surface:#fff;--ink:#111214;--ink2:#4b5057;--muted:#7a8088;--line:#e6e7ea;--accent:#111214;--green:#16a34a;--red:#dc2626;--pill:#f1f2f4}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}.w{max-width:1120px;margin:0 auto;padding:0 24px}
+nav{position:sticky;top:0;z-index:5;background:rgba(250,250,249,.85);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+nav .w{display:flex;align-items:center;justify-content:space-between;height:60px}
+.logo{font-weight:800;letter-spacing:-.02em;display:flex;align-items:center;gap:10px}.logo i{width:10px;height:10px;border-radius:50%;background:var(--green);display:inline-block;box-shadow:0 0 0 4px #dcfce7}
+nav ul{display:flex;gap:26px;list-style:none;margin:0;padding:0;font-size:14px;color:var(--ink2)}nav ul a:hover{color:var(--ink)}
+.btn{display:inline-flex;align-items:center;gap:8px;border-radius:999px;padding:11px 20px;font-weight:600;font-size:14px;border:1px solid var(--ink);background:var(--ink);color:#fff;transition:transform .15s,background .15s}
+.btn:hover{transform:translateY(-1px);background:#2a2c31}.btn.sec{background:transparent;color:var(--ink);border-color:var(--line)}.btn.sec:hover{background:var(--surface);border-color:#c9ccd1}
+.pill{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:600;padding:6px 12px;border-radius:999px;background:var(--pill);color:var(--ink2)}.pill b{color:var(--green)}
+.hero{padding:96px 0 56px}.hero h1{font-size:clamp(44px,7vw,84px);line-height:.98;letter-spacing:-.04em;font-weight:800;margin:22px 0 22px;max-width:900px}
+.hero h1 em{font-style:normal;color:var(--muted)}.hero p{font-size:20px;line-height:1.5;color:var(--ink2);max-width:640px;margin:0 0 30px}
+.ctas{display:flex;gap:12px;flex-wrap:wrap}
+.shot{margin:56px 0 0;border-radius:18px;overflow:hidden;border:1px solid var(--line);box-shadow:0 30px 80px -30px rgba(0,0,0,.25);background:#07090d}
+.shot iframe{width:100%;height:720px;border:0;display:block}
+.cap{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:13px;margin-top:12px}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin:56px 0 0}@media(max-width:860px){.kpis{grid-template-columns:repeat(2,1fr)}}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:22px}.kpi .tag{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.kpi b{display:block;font-size:34px;letter-spacing:-.03em;margin:10px 0 6px}.kpi span{font-size:13px;color:var(--ink2);line-height:1.45}
+section{padding:88px 0;border-top:1px solid var(--line)}section h2{font-size:clamp(30px,4vw,44px);letter-spacing:-.03em;line-height:1.05;margin:0 0 14px;max-width:720px}
+section .lead{font-size:18px;color:var(--ink2);line-height:1.55;max-width:640px;margin:0 0 20px}.more{font-weight:600;font-size:15px;display:inline-flex;gap:6px;align-items:center}.more:hover{gap:10px}
+.split{display:grid;grid-template-columns:1fr 1.25fr;gap:48px;align-items:center}@media(max-width:900px){.split{grid-template-columns:1fr}}
+.split.rev{grid-template-columns:1.25fr 1fr}.split.rev>div:first-child{order:2}@media(max-width:900px){.split.rev>div:first-child{order:0}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}.card img{width:100%;display:block}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:36px}@media(max-width:860px){.grid3{grid-template-columns:1fr}}
+.card .body{padding:16px 18px 18px}.card .body .tag{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--green);margin-bottom:8px;display:block}
+.card h3{margin:0 0 6px;font-size:17px;letter-spacing:-.01em}.card p{margin:0;font-size:14px;color:var(--ink2);line-height:1.5}
+.list{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:36px}@media(max-width:860px){.list{grid-template-columns:1fr}}
+.row{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px}.row .n{font-size:12px;color:var(--muted);font-weight:600}.row h3{margin:6px 0 8px;font-size:18px;letter-spacing:-.01em}.row p{margin:0;font-size:14px;color:var(--ink2);line-height:1.5}
+table{width:100%;border-collapse:collapse;font-size:14px;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}th,td{text-align:left;padding:12px 14px;border-bottom:1px solid var(--line)}th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}tr:last-child td{border-bottom:0}td b{color:var(--green)}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;background:var(--pill);padding:2px 6px;border-radius:6px}
+footer{border-top:1px solid var(--line);padding:40px 0 60px;color:var(--muted);font-size:13px}footer .w{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
+</style></head><body>
+<nav><div class="w"><a class="logo" href="#"><i></i>THE RACE</a>
+<ul><li><a href="#metric">Metric</a></li><li><a href="#broadcast">Broadcast</a></li><li><a href="#scouts">Scouts</a></li><li><a href="#coaches">Coaches</a></li><li><a href="#code">Code</a></li></ul>
+<a class="btn" href="output/race_tv_2021091209_3093.html">Open the mock</a></div></nav>
+
+<header class="hero"><div class="w">
+<span class="pill"><b>●</b> NFL Big Data Bowl · NYU Edition · Nov 2026</span>
+<h1>Every pass play is a race.<br><em>We put it on a clock.</em></h1>
+<p>Two clocks start at the snap: how fast the pass rush breaks the pocket, and how fast a receiver gets open. Measured from Next Gen Stats tracking on every 2021 dropback — per play, per receiver, per team.</p>
+<div class="ctas"><a class="btn" href="output/race_tv_2021091209_3093.html">Watch Mahomes → Hill, 75-yd TD</a><a class="btn sec" href="README.md">Read the README →</a></div>
+<div class="kpis">
+<div class="kpi"><div class="tag">Validated</div><b>73% <span style="font-size:18px;color:var(--muted)">vs</span> 60%</b><span>Completion when the QB throws to a receiver who <i>won</i> the race vs one who hadn't. 1,290 pressured targets.</span></div>
+<div class="kpi"><div class="tag">The clocks</div><b>2.7 s / 1.8 s</b><span>Median pocket clock vs median route clock. The race is closer than it looks.</span></div>
+<div class="kpi"><div class="tag">Sacks</div><b>30% → 17%</b><span>Sack rate when nobody wins vs when a receiver wins by more than a second.</span></div>
+<div class="kpi"><div class="tag">Coaching</div><b>+0.0 s</b><span>Pocket time bought by an extra blocker vs man coverage. Against zone, two blockers buy +0.6 s.</span></div>
+</div>
+<div class="shot"><iframe src="output/race_tv_2021091209_3093.html" title="Broadcast mock" loading="lazy"></iframe></div>
+<div class="cap"><span>Broadcast mock · KC @ PHI, Week 4 · click <b>Lower-third</b>, then <b>Play</b></span><span>Hill open at 1.5 s · pocket breaks at 2.1 s</span></div>
+</div></header>
+
+<section id="metric"><div class="w"><div class="split">
+<div><span class="pill">The metric</span><h2>Separation tells you how much space. The race tells you when.</h2>
+<p class="lead">Pocket clock: seconds from the snap until a rusher is within 2 yards of the quarterback. Route clock: seconds until a receiver has 3 yards of separation after a 5-yard stem — pre-snap cushion doesn't count. A receiver <b>wins</b> when his clock beats the pocket's.</p>
+<a class="more" href="output/chart_validation_target.png">See the validation →</a></div>
+<div class="card"><img src="output/chart_validation_target.png" alt="Completion probability when target won the race"></div>
+</div></div></section>
+
+<section id="broadcast"><div class="w">
+<span class="pill">For broadcasters</span><h2>A live race fans can feel — the NFL's required run rate.</h2>
+<p class="lead">Two bars fill in real time above the play. When one crosses its line the lane flashes: <b>OPEN 1.5s</b> or <b>POCKET BROKE 2.1s</b>. An AI caller (local Qwen via Ollama) turns the numbers into one on-air sentence.</p>
+<div class="grid3">
+<a class="card" href="output/race_tv_2021091209_3093.html"><div class="body"><span class="tag">Hero</span><h3>Mahomes → Hill, 75-yd TD</h3><p>Hill wins at 1.5 s, pocket gone at 2.1 s. The ball is out just in time.</p></div></a>
+<a class="card" href="output/race_tv_2021102401_562.html"><div class="body"><span class="tag">Deep shot</span><h3>Heinicke → McLaurin, 40-yd TD</h3><p>McLaurin open at 1.7 s with 0.9 s to spare before the pocket collapses.</p></div></a>
+<a class="card" href="output/race_tv_2021090900_687.html"><div class="body"><span class="tag">Open man ignored</span><h3>Prescott → Gallup</h3><p>Elliott and Schultz win the race; the throw goes to Gallup at 1.7 yards of separation.</p></div></a>
+</div></div></section>
+
+<section id="scouts"><div class="w"><div class="split rev">
+<div><span class="pill">For scouts</span><h2>Who wins early — not who's open on average.</h2>
+<p class="lead">Baltimore's quick game owns the leaderboard: Marquise Brown wins 86% of pressured routes, with Duvernay, Proche and Andrews close behind. Deep-route stars like Davante Adams and Ja'Marr Chase sit near 40% — the metric finds hot reads, not the best receivers overall.</p>
+<table><tr><th>#</th><th>Receiver</th><th>Team</th><th>Pressured routes</th><th>Won</th></tr>
+<tr><td>1</td><td>Marquise Brown</td><td>BAL</td><td>97</td><td><b>86%</b></td></tr>
+<tr><td>2</td><td>Devin Duvernay</td><td>BAL</td><td>66</td><td><b>83%</b></td></tr>
+<tr><td>3</td><td>James Proche</td><td>BAL</td><td>38</td><td><b>82%</b></td></tr>
+<tr><td>4</td><td>Sterling Shepard</td><td>NYG</td><td>48</td><td><b>81%</b></td></tr>
+<tr><td>5</td><td>Corey Davis</td><td>NYJ</td><td>57</td><td><b>81%</b></td></tr></table></div>
+<div class="card"><img src="output/chart_receivers.png" alt="Receivers: route clock vs win rate under pressure"></div>
+</div></div></section>
+
+<section id="coaches"><div class="w">
+<span class="pill">For coaches</span><h2>What does keeping a blocker in actually buy?</h2>
+<p class="lead">The protection exchange rate: pocket time bought vs. receivers given up, by coverage. Against man, one extra blocker buys nothing and the race-won rate drops from 88% to 83%. Against zone, two extra blockers buy +0.6 s. Plus a per-opponent defense card: pocket clock and race-won-allowed by coverage call.</p>
+<div class="split" style="margin-top:36px"><div class="card"><img src="output/chart_protection.png" alt="Protection exchange rate"></div><div class="card"><img src="output/chart_teams.png" alt="Team sync"></div></div>
+<div class="list">
+<div class="row"><div class="n">01</div><h3>Protection exchange</h3><p><code>protection_exchange.csv</code> — league and per offense, man vs zone: time bought, route clock cost, race-won change.</p></div>
+<div class="row"><div class="n">02</div><h3>Defense cards</h3><p><code>defense_cards.csv</code> — every opponent's pocket clock, pressure rate and completion allowed by coverage.</p></div>
+<div class="row"><div class="n">03</div><h3>Team sync</h3><p><code>race_teams.csv</code> — seconds between first receiver open and pocket breaking. ARI and BAL lead at 1.4 s; PIT and CIN trail at 0.8 s.</p></div>
+</div></div></section>
+
+<section id="code"><div class="w"><div class="split">
+<div><span class="pill">Code</span><h2>Runs end to end on the public Big Data Bowl data.</h2>
+<p class="lead">Python, pandas, numpy, matplotlib. One command per stage; results cached per game so re-runs are instant.</p>
+<a class="more" href="README.md">Method, assumptions and limitations →</a></div>
+<div class="row" style="font-family:ui-monospace,Menlo,monospace;font-size:13px;line-height:1.9;color:var(--ink2)">
+pip install -r requirements.txt<br>python compute_race.py &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# clocks for every receiver-play<br>python make_charts.py &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# scout / coach / position charts<br>python team_report.py &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# validation + protection exchange + defense cards<br>python race_tv.py --game 2021091209 --play 3093 &nbsp;# broadcast mock<br>python race_commentary.py --game 2021091209 --play 3093 --inject<br>ollama create race-caller -f Modelfile &nbsp;# optional LLM caller</div>
+</div></div></section>
+
+<footer><div class="w"><span>THE RACE · NFL Big Data Bowl, NYU Edition</span><span>Data: NFL Next Gen Stats + PFF, 2021 weeks 1–8. Matchups inferred as nearest defender. Thresholds: 2 yd pressure · 3 yd open · 5 yd stem.</span></div></footer>
+</body></html>
