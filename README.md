@@ -1,4 +1,4 @@
-# THE RACE — Pocket Clock vs. Route Clock
+# THE RACE — Pocket Clock vs. Route Clock.
 
 > **Live site (GitHub Pages):** `index.html` links the broadcast mocks and all charts. **Broadcast mock:** open `output/race_tv_2021091209_3093.html` (Mahomes → Hill, 75-yd TD), click **Lower-third**, press Play.
 
