@@ -47,60 +47,67 @@ HTML = r"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>The Race: pocket clock vs route clock</title>
 <style>
-:root{--bg:#0e1116;--panel:#151a21;--ink:#e8eaed;--muted:#8b949e;--line:#262d37;--red:#e5484d;--green:#3fb950;--accent:#f0c35a}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
-.bar{display:flex;align-items:center;gap:14px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel);flex-wrap:wrap}
-.bar h1{font-size:15px;margin:0;font-weight:600;letter-spacing:.01em}.bar h1 span{color:var(--muted);font-weight:400;margin-left:8px}
-select{background:#0e1116;color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:7px 10px;font-size:14px;max-width:560px}
-.bar .r{margin-left:auto;display:flex;gap:8px;align-items:center;color:var(--muted);font-size:13px}
-button{background:#0e1116;color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:7px 12px;font-size:13px;cursor:pointer}button:hover{border-color:var(--accent)}
-.stage{position:relative;max-width:1400px;margin:0 auto}
-canvas{width:100%;height:auto;display:block;background:#1d4d2b;max-height:62vh;object-fit:cover}
-.l3{margin:10px 16px 0;background:rgba(10,13,18,.92);border:1px solid var(--line);border-left:5px solid var(--accent);border-radius:6px;padding:10px 16px;display:grid;grid-template-columns:190px 1fr 1.1fr;gap:16px;align-items:center}
-.l3 .big{font-size:36px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1}.l3 .lab{font-size:11px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
-.rows{display:flex;flex-direction:column;gap:5px}.row{display:grid;grid-template-columns:130px 1fr 80px;gap:10px;align-items:center;font-size:13px;font-weight:600}
-.trk{height:9px;background:#232a34;border-radius:3px;position:relative;overflow:hidden}.trk i{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:3px}
-.row.pocket .trk i{background:var(--red)}.row.route .trk i{background:var(--green)}.tick{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--accent)}
-.row .t{text-align:right;font-variant-numeric:tabular-nums;color:var(--muted);font-weight:600}.row.won .t{color:var(--green)}.row.pocket.won .t{color:var(--red)}
-.verdict{font-size:18px;font-weight:700;color:var(--accent);min-height:24px}.call{font-size:13px;color:var(--ink);margin-top:6px;opacity:.9}
-.ctl{display:flex;gap:10px;align-items:center;padding:10px 16px;max-width:1400px;margin:0 auto;color:var(--muted);font-size:13px}.ctl input{flex:1}
-.notes{max-width:1000px;margin:0 auto;padding:26px 16px 50px;color:var(--muted)}.notes h2{color:var(--ink);font-size:16px;margin:22px 0 6px}.notes p{margin:0 0 10px;max-width:760px}
-.notes table{border-collapse:collapse;font-size:13px;margin:8px 0 14px}.notes td,.notes th{padding:5px 12px 5px 0;text-align:left;border-bottom:1px solid var(--line)}.notes th{color:var(--muted);font-weight:500}
-.notes a{color:var(--ink)}.imgs{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin-top:10px}.imgs img{width:100%;border:1px solid var(--line);border-radius:4px;background:#fff}
-.k{display:inline-block;background:#232a34;border-radius:4px;padding:1px 6px;font-family:ui-monospace,Menlo,monospace;font-size:12px}
-</style></head><body>
-<div class="bar"><h1>The Race<span>pocket clock vs route clock · 2021 Next Gen Stats tracking</span></h1>
-<select id="pick"></select>
-<div class="r"><button id="play">Play</button><button id="reset">Restart</button><label><input type="checkbox" id="an"> show separation lines</label></div></div>
-<div class="stage"><canvas id="field" width="1400" height="560"></canvas>
-<div class="l3"><div><div class="lab" id="sit"></div><div class="big" id="clk">0.0<span style="font-size:16px;color:var(--muted)"> s</span></div><div class="lab" id="desc" style="text-transform:none;letter-spacing:0;margin-top:6px;line-height:1.3"></div></div>
-<div class="rows" id="rows"></div><div><div class="lab">verdict</div><div class="verdict" id="ver">&nbsp;</div><div class="call" id="call"></div></div></div></div>
-<div class="ctl"><input type="range" id="scrub" min="0" value="0" step="1"><span id="tt">0.0 s</span></div>
+:root{--ink:#111;--muted:#666;--line:#e5e5e5;--red:#d33;--green:#1a8a3a;--accent:#111}
+*{box-sizing:border-box}body{margin:0;background:#fff;color:var(--ink);font:16px/1.6 Georgia,"Times New Roman",serif}
+main{max-width:860px;margin:0 auto;padding:48px 20px 80px}
+h1{font-size:30px;font-weight:normal;margin:0 0 6px}h2{font-size:19px;font-weight:normal;margin:40px 0 8px;border-bottom:1px solid var(--line);padding-bottom:4px}
+p{margin:0 0 14px}.sub{color:var(--muted);margin:0 0 28px}a{color:var(--ink)}
+.ui{font:13px/1.4 -apple-system,Helvetica,Arial,sans-serif}
+.bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+select{font:inherit;padding:5px 6px;border:1px solid #ccc;background:#fff;max-width:100%;flex:1}
+button{font:inherit;padding:5px 12px;border:1px solid #ccc;background:#fff;cursor:pointer}button:hover{border-color:#111}
+label{color:var(--muted)}
+canvas{width:100%;height:auto;display:block;border:1px solid var(--line)}
+.l3{display:grid;grid-template-columns:150px 1fr 1fr;gap:16px;align-items:start;padding:12px 0;border-bottom:1px solid var(--line)}
+.big{font-size:28px;font-variant-numeric:tabular-nums;line-height:1.1}.lab{color:var(--muted);font-size:12px}
+.rows{display:flex;flex-direction:column;gap:4px}.row{display:grid;grid-template-columns:110px 1fr 56px;gap:8px;align-items:center}
+.trk{height:6px;background:#f0f0f0;position:relative}.trk i{position:absolute;left:0;top:0;bottom:0;width:0}
+.row.pocket .trk i{background:var(--red)}.row.route .trk i{background:var(--green)}.tick{position:absolute;top:-3px;bottom:-3px;width:1px;background:#111}
+.row .t{text-align:right;font-variant-numeric:tabular-nums;color:var(--muted)}.row.won .t{color:var(--green)}.row.pocket.won .t{color:var(--red)}
+.verdict{font-size:15px;min-height:20px}.call{color:var(--muted);margin-top:4px}
+.ctl{display:flex;gap:10px;align-items:center;padding:8px 0;color:var(--muted)}.ctl input{flex:1}
+table{border-collapse:collapse;width:100%;margin:6px 0 16px;font-size:15px}td{padding:6px 10px 6px 0;border-bottom:1px solid var(--line);vertical-align:top}td:first-child{color:var(--muted);width:42%}
+figure{margin:18px 0}figure img{width:100%;display:block;border:1px solid var(--line)}figcaption{color:var(--muted);font-size:14px;margin-top:4px}
+code,.k{font:13px ui-monospace,Menlo,monospace}footer{margin-top:48px;color:var(--muted);font-size:14px}
+@media(max-width:640px){.l3{grid-template-columns:1fr}}
+</style></head><body><main>
+<h1>The Race</h1>
+<p class="sub">Pocket clock vs. route clock on every 2021 pass play (weeks 1&ndash;8). NFL Big Data Bowl, NYU Edition.</p>
+<p>Two clocks start at the snap. The <span style="color:var(--red)">pocket clock</span> stops when a pass rusher gets within 2 yards of the quarterback. Each <span style="color:var(--green)">route clock</span> stops when that receiver has 3 yards of separation after a 5-yard stem. A receiver wins if he is open before the pocket breaks. The black tick is the throw.</p>
 
-<div class="notes">
-<h2>What you're looking at</h2>
-<p>Two clocks start at the snap. The red one measures how long until a pass rusher gets within 2 yards of the quarterback. Each green one measures how long until that receiver has 3 yards of separation from the nearest defender after travelling 5 yards from where he lined up, so the cushion he was given before the snap doesn't count. The gold tick is the throw. A receiver wins when his clock beats the red one.</p>
-<p>Plays in the menu are grouped: receivers who won the race and were thrown to; plays where someone won by half a second or more but the ball went elsewhere; and sacks where nobody won.</p>
-<h2>Why it matters</h2>
-<p>On 1,593 pressured, targeted passes (target identified by player ID from nflverse, interceptions included), throws to a receiver who had already won his race were completed 57% of the time; throws to one who hadn't, 48%. By CPOE, which already accounts for air yards and situation, that is 6.4 points above expected, and both groups throw the same distance (11.0 vs 10.8 air yards). The gap lives on short passes (62% vs 49%) and disappears on deep ones (43% vs 45%). Sack rate on pressured dropbacks is 30% when no receiver wins and 17% when one wins by more than a second.</p>
-<p>We also checked whether the race adds anything a separation stat does not. In a logistic regression on the same passes, separation at the throw is the strongest predictor of completion and the race margin adds nothing on top of it; on top of nflverse's public expected-completion model it adds almost nothing (AUC 0.651 to 0.654). We think that is the right result: the race is the same information measured earlier and attributed to a player and a moment, not a new predictor. It is also not value: across receivers, win rate under pressure barely correlates with EPA per target (r = +0.07) or with NGS average separation (r = +0.03). The thresholds (2, 3 and 5 yards) move the levels; the sack-rate gap holds at every setting we tried, the completion gap shrinks or reverses when the pressure radius is tightened. Details in <span class="k">output/model_results.csv</span> and <span class="k">output/robustness.csv</span>.</p>
-<table><tr><th>Pressured dropbacks</th><th>Pocket breaks (median)</th><th>First receiver open (median)</th><th>WR / TE / RB already open when it breaks</th></tr>
-<tr><td>2,660</td><td>2.7 s</td><td>1.6 s</td><td>63% / 57% / 71%</td></tr></table>
-<h2>Who wins the race</h2>
-<p>Baltimore's receivers, by a distance: Marquise Brown wins 86% of his pressured routes, Devin Duvernay 83%, James Proche 82%, Mark Andrews 77%. The quick game shows up in the numbers. At the other end sit Davante Adams (40%) and Ja'Marr Chase (41%), because deep routes come open after the pocket has already broken. This is a measure of who gives the quarterback an early answer, not of who the best receiver is.</p>
-<h2>For coaches</h2>
-<p>Keeping a back or tight end in to block is supposed to buy time. Against man coverage it doesn't: one extra blocker leaves the pocket clock at 2.5 s (2.6 s with none) and drops the share of plays with someone open in time from 88% to 83%. Against zone, two extra blockers buy 0.6 s. The per-team numbers are in <span class="k">output/protection_exchange.csv</span>; every defense's pocket clock and completion allowed by coverage call is in <span class="k">output/defense_cards.csv</span>.</p>
-<div class="imgs"><img src="output/chart_validation_target.png" alt=""><img src="output/chart_receivers.png" alt=""><img src="output/chart_value.png" alt=""><img src="output/chart_protection.png" alt=""><img src="output/chart_teams.png" alt=""></div>
-<h2>Method, limits, code</h2>
-<p>Python with pandas, numpy and matplotlib; everything runs from the public Big Data Bowl files plus free nflverse play-by-play (EPA, win probability, air yards, CPOE, targeted receiver), joined on game and play ID. The EPA and win-probability numbers shown for each play come from nflverse's models. Matchups are the nearest defender; PFF does not label assignments. Thresholds are football-reasonable, not tuned. Tracking stops at the throw, so this describes the race up to the release and says nothing about the catch. See the <a href="README.md">README</a> and <span class="k">compute_race.py</span>, <span class="k">team_report.py</span>, <span class="k">race_tv.py</span>.</p>
+<div class="ui">
+<div class="bar"><select id="pick"></select><button id="play">Play</button><button id="reset">Restart</button><label><input type="checkbox" id="an"> separation lines</label></div>
+<canvas id="field" width="1400" height="620"></canvas>
+<div class="ctl"><input type="range" id="scrub" min="0" value="0" step="1"><span id="tt">0.0 s</span></div>
+<div class="l3"><div><div class="big" id="clk">0.0<span style="font-size:14px;color:var(--muted)"> s</span></div><div class="lab" id="sit"></div></div>
+<div class="rows" id="rows"></div><div><div class="verdict" id="ver">&nbsp;</div><div class="lab" id="desc" style="margin-top:6px"></div><div class="call" id="call"></div></div></div>
 </div>
 
+<h2>What we found</h2>
+<table>
+<tr><td>Pressured dropbacks</td><td>2,660. The pocket breaks at a median 2.7 s; the first receiver is open at 1.6 s.</td></tr>
+<tr><td>Throw to a receiver who won vs. lost his race</td><td>57% vs. 48% completion, +6.4 points above expected (CPOE), same throw depth (11.0 vs. 10.8 air yards). n = 1,593.</td></tr>
+<tr><td>Short vs. deep</td><td>The gap is on short passes (62% vs. 49%). On deep passes there is none (43% vs. 45%).</td></tr>
+<tr><td>Sacks</td><td>30% when nobody wins, 17% when a receiver wins by more than a second.</td></tr>
+<tr><td>Who wins</td><td>Marquise Brown 86%, Devin Duvernay 83%. Davante Adams 40% and Ja'Marr Chase 41%, though both still produce high EPA per target.</td></tr>
+<tr><td>Extra blocker vs. man coverage</td><td>Buys no pocket time (2.6 &rarr; 2.5 s) and cuts the race-won rate from 88% to 83%.</td></tr>
+</table>
+<figure><img src="output/chart_validation_target.png" alt="Completion when the target won vs lost the race"><figcaption>Completion and completion above expected, by race outcome.</figcaption></figure>
+<figure><img src="output/chart_receivers.png" alt="Receivers: route clock vs win rate"><figcaption>One dot per receiver: how fast he gets open vs. how often he beats the pocket.</figcaption></figure>
+<figure><img src="output/chart_value.png" alt="Win rate vs EPA and NGS separation"><figcaption>Winning early is not the same as being valuable, and it is not NGS separation.</figcaption></figure>
+<figure><img src="output/chart_protection.png" alt="Protection exchange rate"><figcaption>What keeping a blocker in actually buys, by coverage.</figcaption></figure>
+
+<h2>Limits</h2>
+<p>The race measures timing, not value: it adds almost nothing to completion models beyond separation at the throw. Matchups are the nearest defender, the 2/3/5-yard thresholds are not tuned, and tracking stops at the throw. EPA, CPOE and win probability come from nflverse.</p>
+
+<footer>Code and method: <a href="README.md">README</a> &middot; <a href="https://github.com/Subhradeep246/NYUgiants">GitHub</a> &middot; <a href="output/the_race.mp4">1-minute video</a></footer>
+</main>
 <script>
 const PLAYS = __PLAYS__;
 const TH = PLAYS[0].thresholds;
 const cv = document.getElementById('field'), ctx = cv.getContext('2d');
 const X = x => x / 120 * cv.width, Y = y => (53.3 - y) / 53.3 * cv.height;
-const color = p => p.role === 'Pass' ? '#f0c35a' : p.role === 'Pass Route' ? '#3fb950' : p.role === 'Pass Rush' ? '#e5484d' : p.role === 'Coverage' ? '#ffffff' : '#8b949e';
+const color = p => p.role === 'Pass' ? '#e6b800' : p.role === 'Pass Route' ? '#1a8a3a' : p.role === 'Pass Rush' ? '#dd3333' : p.role === 'Coverage' ? '#ffffff' : '#9a9a9a';
 let D, F, n, snapK, endK, tPressure, tEnd, maxT, k = 0, timer = null;
 const t = k => Math.max(0, (k - snapK) / 10);
 const pick = document.getElementById('pick');
@@ -124,8 +131,8 @@ function load(i) {
   k = 0; const s = document.getElementById('scrub'); s.max = n - 1; s.value = 0; draw(0);
 }
 function drawField() {
-  ctx.fillStyle = '#1d4d2b'; ctx.fillRect(0, 0, cv.width, cv.height);
-  ctx.fillStyle = '#173d22'; ctx.fillRect(0, 0, X(10), cv.height); ctx.fillRect(X(110), 0, X(10), cv.height);
+  ctx.fillStyle = '#5b8a64'; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.fillStyle = '#4e7a57'; ctx.fillRect(0, 0, X(10), cv.height); ctx.fillRect(X(110), 0, X(10), cv.height);
   ctx.strokeStyle = 'rgba(255,255,255,.3)'; ctx.lineWidth = 1;
   for (let x = 10; x <= 110; x += 5) { ctx.beginPath(); ctx.moveTo(X(x), 0); ctx.lineTo(X(x), cv.height); ctx.stroke(); }
   ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center';
