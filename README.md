@@ -2,7 +2,14 @@
 
 **Site:** https://subhradeep246.github.io/NYUgiants/ · **Video (1 min):** [`output/the_race.mp4`](output/the_race.mp4)
 
-We built a metric that times every 2021 pass play (weeks 1–8) as a race between two clocks: the **pocket clock**, the seconds until a pass rusher gets within 2 yards of the QB, and a **route clock** for every WR, TE and RB, the seconds until he has 3 yards of separation after a 5-yard stem. A receiver **wins** if he is open before the pocket breaks. The insight: when the QB is pressured and throws to a receiver who won his race, the pass completes 57% of the time vs 48% when he hadn't won, which is **+6.4 points above expected** (nflverse CPOE) at the same throw depth, and the sack rate falls from 30% to 17% when someone wins by more than a second. Receivers split sharply: Baltimore's quick game (Marquise Brown 86%, Devin Duvernay 83%) wins most often, while Davante Adams (40%) and Ja'Marr Chase (41%) rarely win before the pocket breaks yet still produce high EPA per target. That tells you the race measures timing, not overall value. Broadcasters get a live two-clock graphic, scouts get "who gives the QB an early answer," and coaches get what keeping a blocker in really buys (against man coverage, one extra blocker buys no pocket time).
+**What we built.** A metric that times every 2021 pass play (weeks 1–8) as a race between two clocks. The **pocket clock** is the seconds until a pass rusher gets within 2 yards of the QB. Each WR, TE and RB has a **route clock**: the seconds until he has 3 yards of separation after a 5-yard stem. A receiver **wins** if he is open before the pocket breaks.
+
+**What insight it reveals.** Under pressure, a throw to a receiver who won his race completes 57% of the time vs 48% when he hadn't won. That is **+6.4 points above expected** (nflverse CPOE) at the same throw depth. The sack rate also falls from 30% to 17% when someone wins by more than a second. Receivers split sharply: Baltimore's quick game wins most often (Marquise Brown 86%, Devin Duvernay 83%). Davante Adams (40%) and Ja'Marr Chase (41%) rarely win before the pocket breaks yet still produce high EPA per target, so the race measures timing, not overall value.
+
+**Who would use it.**
+- **Broadcasters:** a live two-clock graphic that shows a receiver getting open as the pocket closes, with the play's EPA and win-probability swing.
+- **Scouts:** a leaderboard of receivers who give the QB an early answer under pressure.
+- **Coaches:** what keeping a blocker in really buys. Against man coverage, one extra blocker buys no pocket time and cuts the race-won rate from 88% to 83%.
 
 ![Completion when the target won vs lost the race](output/chart_validation_target.png)
 
