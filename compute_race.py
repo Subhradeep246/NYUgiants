@@ -27,9 +27,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(HERE, "nfl-big-data-bowl-regional-event-data-main", "data")
 OUT = os.path.join(HERE, "output")
 
-PRESSURE_RADIUS = 2.0   # yards: rusher this close to QB = pocket has broken
-OPEN_SEP = 3.0          # yards: receiver this far from nearest defender = open
-MIN_ROUTE_DIST = 5.0    # yards: receiver must have moved this far from his snap spot
+PRESSURE_RADIUS = float(os.environ.get("RACE_PRESSURE", 2.0))   # yards: rusher this close to QB = pocket has broken
+OPEN_SEP = float(os.environ.get("RACE_OPEN", 3.0))               # yards: receiver this far from nearest defender = open
+MIN_ROUTE_DIST = float(os.environ.get("RACE_STEM", 5.0))         # yards: receiver must have moved this far from his snap spot
                         # (pre-snap cushion is space you were GIVEN, not space you WON)
 MIN_FRAME_AFTER_SNAP = 10  # clock can't be "won" before 1.0s (no QB throws earlier)
 END_EVENTS = {"pass_forward", "qb_sack", "qb_strip_sack", "run", "autoevent_passforward",
@@ -130,7 +130,8 @@ def main(n_games=None):
     if n_games:
         files = files[:n_games]
 
-    cache = os.path.join(OUT, "cache")
+    tag = f"{PRESSURE_RADIUS:g}_{OPEN_SEP:g}_{MIN_ROUTE_DIST:g}"
+    cache = os.path.join(OUT, "cache" if tag == "2_3_5" else f"cache_{tag}")
     os.makedirs(cache, exist_ok=True)
     parts = []
     for k, f in enumerate(files, 1):
@@ -170,7 +171,10 @@ def main(n_games=None):
     df["margin"] = df.t_pressure.fillna(df.play_len) - df.t_open   # + = open with time to spare
 
     os.makedirs(OUT, exist_ok=True)
-    df.to_csv(os.path.join(OUT, "race_routes.csv"), index=False)
+    suffix = "" if tag == "2_3_5" else f"_{tag}"
+    df.to_csv(os.path.join(OUT, f"race_routes{suffix}.csv"), index=False)
+    if suffix:                       # sensitivity run: only the routes file is needed
+        print(f"sensitivity run {tag}: wrote race_routes{suffix}.csv"); return
 
     # ---- per-receiver leaderboard ---------------------------------------
     skill = df[df.officialPosition.isin(["WR", "TE", "RB", "FB"])]

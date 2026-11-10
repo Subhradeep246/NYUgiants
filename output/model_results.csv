@@ -1,0 +1,6 @@
+model,auc,logloss,n
+"pre-throw context only (depth, coverage, down/distance)",0.5936449744539019,0.6155387935650295,1290
+pre-throw context + race margin,0.600875866222258,0.6137322069605852,1290
+separation at throw only,0.6880240002886251,0.5856986185588657,1290
+separation + depth + coverage + down/distance + time to throw,0.679193181786645,0.5852953329766621,1290
+... + race margin,0.6774531053564936,0.585431738688389,1290

@@ -6,3 +6,5 @@ output/compute_log.txt
 __pycache__/
 
 __pycache__/
+output/race_routes_*.csv
+output/cache_*/
