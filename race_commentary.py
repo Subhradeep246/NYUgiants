@@ -82,7 +82,7 @@ def commentary(game, play, model):
     try:
         line, source = llm_call(f, model), model
     except Exception as e:                                               # Ollama not running / model missing
-        line, source = template_call(f), f"template (ollama unavailable: {type(e).__name__})"
+        line, source = template_call(f), "rule-based call — run with Ollama for the LLM version"
     return f, line, source
 
 
