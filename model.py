@@ -3,9 +3,10 @@ THE RACE - does the race add information beyond separation?  Plus threshold robu
 ----------------------------------------------------------------------------------------
 1. Completion model. On pressured, targeted passes we fit a logistic regression (plain numpy, no sklearn)
    predicting completion from what a separation-based stat already knows - separation at the throw,
-   how far the ball travelled (route depth), coverage type, down & distance, time to throw - and then add
-   the race margin (seconds the target was open before the pocket broke). If AUC / log-loss improve
-   out of sample, the race carries information that separation alone does not.
+   how far the ball travelled (nflverse air yards), coverage type, down & distance, time to throw - and then
+   add the race margin (seconds the target was open before the pocket broke). If AUC / log-loss improve
+   out of sample, the race carries information that separation alone does not. We run the same test
+   against nflverse's public expected-completion model (cp).
 2. Robustness. Re-computes the headline numbers under different thresholds (pressure radius, open
    separation) on a 30-game subset, from the race_routes_<p>_<o>_<s>.csv files written by
    `RACE_PRESSURE=1.5 python compute_race.py --games 30` etc.
@@ -15,7 +16,6 @@ Usage: python model.py
 """
 import glob
 import os
-import re
 
 import matplotlib
 matplotlib.use("Agg")
@@ -34,21 +34,17 @@ plt.rcParams.update({"font.family": "DejaVu Sans", "axes.edgecolor": GRID, "axes
 
 # ----------------------------------------------------------------------------- data
 def targeted(routes):
-    """Rows of the receiver the QB threw to, pressured plays, C/I only (INT text differs)."""
-    r = routes[routes.pressured & routes.passResult.isin(["C", "I"])].copy()
-    def tgt(d):
-        m = re.search(r"pass .*?to ([A-Z][A-Za-z'\-]*\.\s?[A-Za-z'\-\.]+)", str(d))
-        return m.group(1).replace(" ", "").lower() if m else None
-    r["tgt"] = r.playDescription.map(tgt)
-    r["short"] = r.displayName.map(lambda n: f"{n.split()[0][0]}.{n.replace(' Jr.', '').replace(' III', '').replace(' II', '').split()[-1]}".lower())
-    r = r[r.tgt.notna() & (r.tgt == r.short)].drop_duplicates(["gameId", "playId"]).copy()
+    """Rows of the receiver the QB threw to, pressured plays, C / I / INT (an interception counts as not complete).
+    The target is identified by player ID from nflverse (`targeted`, set in compute_race.py), and route depth
+    is nflverse air_yards. Rows without air yards (9 spikes / throwaways) are dropped."""
+    r = routes[routes.pressured & routes.passResult.isin(["C", "I", "IN"]) & routes.targeted.fillna(False).astype(bool)]
+    r = r.drop_duplicates(["gameId", "playId"]).copy()
     r["complete"] = r.passResult.eq("C").astype(int)
-    # route depth proxy: "short" / "deep" in the play text, plus yards if complete
-    r["deep"] = r.playDescription.str.contains(r"\b(?:deep)\b").astype(int)
     r["man"] = r.pff_passCoverageType.eq("Man").astype(int)
     r["third"] = (r.down >= 3).astype(int)
     r["margin_c"] = r.margin.fillna(-2).clip(-2, 2)      # never open -> worst margin
-    r = r.dropna(subset=["sep_at_throw", "play_len", "yardsToGo"])
+    r["cp_logit"] = np.log(r.cp.clip(.01, .99) / (1 - r.cp.clip(.01, .99)))   # nflverse expected completion
+    r = r.dropna(subset=["sep_at_throw", "play_len", "yardsToGo", "air_yards", "cp"])
     return r
 
 
@@ -98,16 +94,19 @@ def cv_eval(df, cols, k=5, seed=11):
 
 def model_section(routes):
     t = targeted(routes)
-    base = ["sep_at_throw", "deep", "man", "third", "yardsToGo", "play_len"]
+    base = ["sep_at_throw", "air_yards", "man", "third", "yardsToGo", "play_len"]
     full = base + ["margin_c"]
     b, f = cv_eval(t, base), cv_eval(t, full)
     sep_only = cv_eval(t, ["sep_at_throw"])
-    pre = ["deep", "man", "third", "yardsToGo"]                       # known before / without the throw
+    pre = ["air_yards", "man", "third", "yardsToGo"]                  # known without tracking the throw
     pre_b, pre_f = cv_eval(t, pre), cv_eval(t, pre + ["margin_c"])
-    rows = [dict(model="pre-throw context only (depth, coverage, down/distance)", auc=pre_b["auc"], logloss=pre_b["logloss"], n=pre_b["n"]),
+    cp_b, cp_f = cv_eval(t, ["cp_logit"]), cv_eval(t, ["cp_logit", "margin_c"])   # the public benchmark
+    rows = [dict(model="pre-throw context only (air yards, coverage, down/distance)", auc=pre_b["auc"], logloss=pre_b["logloss"], n=pre_b["n"]),
             dict(model="pre-throw context + race margin", auc=pre_f["auc"], logloss=pre_f["logloss"], n=pre_f["n"]),
+            dict(model="nflverse expected completion (cp) only", auc=cp_b["auc"], logloss=cp_b["logloss"], n=cp_b["n"]),
+            dict(model="nflverse cp + race margin", auc=cp_f["auc"], logloss=cp_f["logloss"], n=cp_f["n"]),
             dict(model="separation at throw only", auc=sep_only["auc"], logloss=sep_only["logloss"], n=sep_only["n"]),
-            dict(model="separation + depth + coverage + down/distance + time to throw", auc=b["auc"], logloss=b["logloss"], n=b["n"]),
+            dict(model="separation + air yards + coverage + down/distance + time to throw", auc=b["auc"], logloss=b["logloss"], n=b["n"]),
             dict(model="... + race margin", auc=f["auc"], logloss=f["logloss"], n=f["n"])]
     res = pd.DataFrame(rows)
     res.to_csv(os.path.join(OUT, "model_results.csv"), index=False)
@@ -126,7 +125,7 @@ def model_section(routes):
     ax.axvline(0, color="#c0392b", ls="--", lw=1.2); ax.text(0.05, 100 * pg.min() + 1, "pocket breaks before he is open  |  open before pocket breaks", fontsize=8.5, color=MUTED)
     ax.set_xlabel("race margin of the targeted receiver (seconds open before the pocket broke)")
     ax.set_ylabel("modelled completion probability (%)")
-    ax.set_title("Completion probability rises with the race margin, holding separation, depth and coverage fixed",
+    ax.set_title("Completion probability vs the race margin, holding separation, air yards and coverage fixed",
                  loc="left", fontsize=11.5, fontweight="bold", color=INK, pad=14)
     ax.text(0, 1.02, f"Logistic regression, pressured targeted passes (n={f['n']}). Adding the margin moves 5-fold AUC {b['auc']:.3f} -> {f['auc']:.3f}.",
             transform=ax.transAxes, color=MUTED, fontsize=9)

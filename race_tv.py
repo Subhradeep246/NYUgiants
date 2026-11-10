@@ -25,6 +25,17 @@ OUT = os.path.join(HERE, "output")
 
 from compute_race import PRESSURE_RADIUS, OPEN_SEP, MIN_ROUTE_DIST, MIN_FRAME_AFTER_SNAP, \
     END_EVENTS, SNAP_EVENTS
+import nflverse
+
+
+def value_line(v):
+    """'EPA +2.31 · win prob +4.1%' from nflverse play values ('' if unavailable)."""
+    parts = []
+    if v.get("epa") is not None:
+        parts.append(f"EPA {v['epa']:+.2f}")
+    if v.get("wpa") is not None:
+        parts.append(f"win prob {100 * v['wpa']:+.1f}%")
+    return "  ·  ".join(parts)
 
 
 def pick_play(routes):
@@ -96,11 +107,13 @@ def build(game, play):
 
     offense = meta.possessionTeam
     desc = meta.playDescription
+    val = nflverse.play_value(int(game), int(play))
     payload = dict(
         game=int(game), play=int(play), frames=[int(f) for f in frames], f_snap=f_snap, f_end=f_end,
         title=f"{gm.visitorTeamAbbr} @ {gm.homeTeamAbbr}  ·  Week {int(gm.week)}, 2021  ·  Q{int(meta.quarter)} {meta.gameClock}",
         situation=f"{int(meta.down)}{'st' if meta.down == 1 else 'nd' if meta.down == 2 else 'rd' if meta.down == 3 else 'th'} & {int(meta.yardsToGo)}  ·  {meta.pff_passCoverage} ({meta.pff_passCoverageType})",
         desc=desc, offense=offense, defense=meta.defensiveTeam,
+        value=value_line(val), target=val.get("target_nflId"),
         los=float(meta.absoluteYardlineNumber) if g.playDirection.iloc[0] == "right" else 120 - float(meta.absoluteYardlineNumber),
         players=[dict(id=int(i), name=names.displayName.get(i, "?"), pos=names.officialPosition.get(i, ""),
                       team=str(g[g.nflId == i].team.iloc[0]), role=role[int(i)], xy=pos[int(i)],
@@ -181,7 +194,7 @@ const D = __DATA__;
 const F = D.frames, n = F.length, snapK = F.indexOf(D.f_snap), endK = F.indexOf(D.f_end);
 const t = k => Math.max(0, (k - snapK) / 10);
 document.getElementById('title').textContent = D.title;
-document.getElementById('sit').textContent = D.situation;
+document.getElementById('sit').textContent = D.situation + (D.value ? '  ·  ' + D.value : '');
 document.getElementById('desc').textContent = D.desc;
 document.getElementById('thP').textContent = D.thresholds.pressure;
 document.getElementById('thO').textContent = D.thresholds.open;
@@ -203,7 +216,7 @@ D.receivers.sort((a,b)=> (a.tOpen??99)-(b.tOpen??99));
 D.receivers.forEach(r => r.el = lane('route', r.name, r.pos));
 
 // --- lower-third rows
-document.getElementById('l3sit').textContent = D.situation;
+document.getElementById('l3sit').textContent = D.situation + (D.value ? '  ·  ' + D.value : '');
 const L = document.getElementById('l3rows');
 function l3row(cls, label) { const el = document.createElement('div'); el.className = 'row ' + cls; el.innerHTML = `<div>${label}</div><div class="bar"><i></i><span class="tick" style="left:${100*tEnd/maxT}%"></span></div><div class="t">—</div>`; L.appendChild(el); return el; }
 const l3pocket = l3row('pocket', 'POCKET');

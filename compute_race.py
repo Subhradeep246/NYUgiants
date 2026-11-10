@@ -12,6 +12,7 @@ in the 2021 Big Data Bowl tracking data and writes:
   output/race_routes.csv   one row per receiver-play (t_pressure, t_open, won)
   output/race_players.csv  per-receiver leaderboard (win rate, median clocks)
   output/race_teams.csv    per-offense "protection-route sync"
+Plays are joined to nflverse (nflverse.py) for EPA / WPA / air yards / CPOE and the targeted receiver (by ID).
 
 Usage:  python compute_race.py [--games N]   (N = number of games, default all)
 """
@@ -22,6 +23,8 @@ import sys
 
 import numpy as np
 import pandas as pd
+
+import nflverse
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(HERE, "nfl-big-data-bowl-regional-event-data-main", "data")
@@ -170,6 +173,12 @@ def main(n_games=None):
     df["won"] = np.where(df.pressured, df.t_open < df.t_pressure, df.t_open.notna())
     df["margin"] = df.t_pressure.fillna(df.play_len) - df.t_open   # + = open with time to spare
 
+    # ---- what the play was worth (nflverse): epa, wpa, air_yards, cpoe, and who was targeted (by ID)
+    df = nflverse.add_values(df)
+    for c in nflverse.VALUE_COLS:                # offline fallback: columns exist, values empty
+        if c not in df:
+            df[c] = np.nan
+
     os.makedirs(OUT, exist_ok=True)
     suffix = "" if tag == "2_3_5" else f"_{tag}"
     df.to_csv(os.path.join(OUT, f"race_routes{suffix}.csv"), index=False)
@@ -189,6 +198,14 @@ def main(n_games=None):
                median_margin=("margin", "median"),
                avg_sep_at_throw=("sep_at_throw", "mean"))
           .reset_index())
+    # value when thrown to: deep receivers win the race less often, but each target is worth more
+    val = (skill[skill.targeted].groupby("nflId")
+           .agg(targets=("playId", "size"), epa_per_target=("epa", "mean"),
+                adot=("air_yards", "mean"), cpoe=("cpoe", "mean")))
+    lb = lb.join(val, on="nflId")
+    ngs = nflverse.ngs_receivers()               # NGS avg separation, for comparison with the race
+    if ngs is not None:
+        lb = lb.merge(ngs, on="nflId", how="left")
     lb = lb[(lb.routes >= 30) & (lb.pressured_routes >= 10)].sort_values("win_rate_under_pressure", ascending=False)
     lb.to_csv(os.path.join(OUT, "race_players.csv"), index=False)
 
@@ -196,7 +213,8 @@ def main(n_games=None):
     per_play = (df.groupby(["gameId", "playId", "possessionTeam"])
                 .agg(t_pressure=("t_pressure", "first"),
                      play_len=("play_len", "first"),
-                     t_first_open=("t_open", "min"))
+                     t_first_open=("t_open", "min"),
+                     epa=("epa", "first"))
                 .reset_index())
     per_play["pocket_clock"] = per_play.t_pressure.fillna(per_play.play_len)
     per_play["sync"] = per_play.pocket_clock - per_play.t_first_open
@@ -206,7 +224,8 @@ def main(n_games=None):
                   median_pocket_clock=("t_pressure", "median"),
                   median_first_open=("t_first_open", "median"),
                   median_sync=("sync", "median"),
-                  race_won_rate=("sync", lambda s: (s > 0).mean()))
+                  race_won_rate=("sync", lambda s: (s > 0).mean()),
+                  epa_per_dropback=("epa", "mean"))
              .reset_index().sort_values("median_sync", ascending=False))
     teams.to_csv(os.path.join(OUT, "race_teams.csv"), index=False)
 

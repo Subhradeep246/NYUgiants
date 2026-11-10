@@ -1,10 +1,11 @@
 """
 THE RACE - charts
 -----------------
-Reads output/race_*.csv (from compute_race.py) and writes three PNGs:
+Reads output/race_*.csv (from compute_race.py) and writes four PNGs:
   output/chart_receivers.png  scout view  - route clock vs. win rate, one dot per receiver
   output/chart_teams.png      coach view  - protection/route sync per offense
   output/chart_positions.png  the headline - how often each position wins the race
+  output/chart_value.png      scout view 2 - win rate vs EPA per target and vs NGS separation (nflverse)
 Usage: python make_charts.py
 """
 import os
@@ -77,6 +78,41 @@ def teams_chart(teams):
     plt.close(fig)
 
 
+def value_chart(lb):
+    """Scout view 2 (nflverse): does winning the race early go with value per target, and is it just
+    NGS separation under another name?  Two panels, one dot per WR/TE."""
+    need = {"epa_per_target", "targets", "ngs_avg_separation"}
+    if not need.issubset(lb.columns) or lb.epa_per_target.isna().all():
+        print("value chart skipped (no nflverse columns in race_players.csv)"); return
+    d = lb[lb.officialPosition.isin(["WR", "TE"]) & (lb.routes >= 80) & (lb.targets >= 20)].copy()
+    fig, axes = plt.subplots(1, 2, figsize=(14, 6.2), dpi=160)
+    panels = [(axes[0], "epa_per_target", "EPA per target (nflverse)", "Winning early is not the same as being valuable"),
+              (axes[1], "ngs_avg_separation", "NGS average separation at the catch point (yds)", "...and it is not NGS separation either")]
+    for ax, col, ylab, title in panels:
+        e = d.dropna(subset=[col])
+        for pos in ["WR", "TE"]:
+            q = e[e.officialPosition == pos]
+            ax.scatter(100 * q.win_rate_under_pressure, q[col], s=10 + q.targets * 1.6, c=POS_COLOR[pos], alpha=.75,
+                       edgecolor="white", linewidth=1, label=f"{pos} (n={len(q)})")
+        r = np.corrcoef(e.win_rate_under_pressure, e[col])[0, 1]
+        ax.axvline(100 * e.win_rate_under_pressure.median(), color=MUTED, lw=1, ls=":")
+        ax.axhline(e[col].median(), color=MUTED, lw=1, ls=":")
+        lab = pd.concat([e.nlargest(4, col), e.nsmallest(2, col), e.nlargest(3, "win_rate_under_pressure"),
+                         e.nsmallest(3, "win_rate_under_pressure")]).drop_duplicates("nflId")
+        for _, x in lab.iterrows():
+            ax.annotate(x.displayName.split(" ")[-1], (100 * x.win_rate_under_pressure, x[col]), xytext=(6, 4),
+                        textcoords="offset points", fontsize=8.5, color=INK)
+        ax.set_xlabel("Win rate when pressured (% of pressured routes open before the pocket broke)")
+        ax.set_ylabel(ylab)
+        ax.set_title(title, loc="left", fontsize=12.5, fontweight="bold", color=INK, pad=18)
+        ax.text(0, 1.015, f"correlation r = {r:+.2f}  ·  {len(e)} WR/TE with 80+ routes and 20+ targets. Dot size = targets.",
+                transform=ax.transAxes, color=MUTED, fontsize=9)
+    axes[0].legend(frameon=False, loc="lower center", fontsize=9)
+    fig.tight_layout()
+    fig.savefig(os.path.join(OUT, "chart_value.png"))
+    plt.close(fig)
+
+
 def positions_chart(routes):
     r = routes[routes.pressured & routes.officialPosition.isin(["WR", "TE", "RB"])]
     g = r.groupby("officialPosition").agg(win=("won", "mean"), n=("won", "size"), t=("t_open", "median")).loc[["WR", "TE", "RB"]]
@@ -101,4 +137,5 @@ if __name__ == "__main__":
     receivers_chart(lb, routes)
     teams_chart(teams)
     positions_chart(routes)
-    print("wrote chart_receivers.png, chart_teams.png, chart_positions.png in", OUT)
+    value_chart(lb)
+    print("wrote chart_receivers.png, chart_teams.png, chart_positions.png, chart_value.png in", OUT)

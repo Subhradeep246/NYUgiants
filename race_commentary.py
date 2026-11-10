@@ -13,7 +13,7 @@ Options: --model qwen3:4b   (any model you have pulled in Ollama)
 import argparse
 import json
 import os
-import re
+import re          # used to strip qwen3 <think> tags and old AI-call panels
 import urllib.request
 
 import pandas as pd
@@ -23,8 +23,10 @@ OUT = os.path.join(HERE, "output")
 OLLAMA = "http://localhost:11434/api/generate"
 
 SYSTEM = ("You are an NFL TV analyst. You get the timing numbers of one pass play: when the pocket broke "
-          "(pocket clock) and when each receiver got open (route clock). Write ONE punchy sentence (max 25 words) "
-          "a broadcaster would say on air. Be concrete: name players and quote the seconds. Never invent facts.")
+          "(pocket clock) and when each receiver got open (route clock), plus what the play was worth "
+          "(epa, win_prob_added_pct). Write ONE punchy sentence (max 25 words) a broadcaster would say on air. "
+          "Be concrete: name players and quote the seconds; mention the win-probability swing only if it is 3 points "
+          "or more. Never invent facts.")
 
 
 def play_facts(game, play):
@@ -35,16 +37,17 @@ def play_facts(game, play):
     p = r.iloc[0]
     tp = None if pd.isna(p.t_pressure) else float(p.t_pressure)
     desc = str(p.playDescription)
-    m = re.search(r"pass .*?to ([A-Z][A-Za-z'\-]*\.\s?[A-Za-z'\-\.]+)", desc)
-    target = m.group(1).replace(" ", "") if m else None
     recs = [dict(name=x.displayName, pos=x.officialPosition,
                  t_open=None if pd.isna(x.t_open) else round(float(x.t_open), 1),
                  won=bool(x.won), sep_at_throw=round(float(x.sep_at_throw), 1),
-                 targeted=bool(target and target.lower() == f"{x.displayName.split()[0][0]}.{x.displayName.split()[-1]}".lower()))
+                 targeted=bool(x.targeted) if not pd.isna(x.targeted) else False)   # nflverse, by player ID
             for x in r.itertuples()]
+    num = lambda v, d: None if pd.isna(v) else round(float(v), d)
     return dict(offense=p.possessionTeam, defense=p.defensiveTeam, down=int(p.down), yards_to_go=int(p.yardsToGo),
                 coverage=p.pff_passCoverage, result={"C": "complete", "I": "incomplete", "S": "sack", "IN": "interception", "R": "scramble"}.get(p.passResult, p.passResult),
-                pocket_clock_s=tp, ball_out_s=round(float(p.play_len), 1), receivers=recs, play_text=desc)
+                pocket_clock_s=tp, ball_out_s=round(float(p.play_len), 1), receivers=recs,
+                epa=num(p.epa, 2), win_prob_added_pct=None if pd.isna(p.wpa) else round(100 * float(p.wpa), 1),
+                play_text=desc)
 
 
 def template_call(f):
@@ -63,6 +66,8 @@ def template_call(f):
         line += f" — and the quarterback finds him. {f['result'].capitalize()}."
     else:
         line += "."
+    if f.get("win_prob_added_pct") is not None and abs(f["win_prob_added_pct"]) >= 3:
+        line += f" That swings win probability {f['win_prob_added_pct']:+.1f}%."
     return line
 
 

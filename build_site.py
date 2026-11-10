@@ -8,7 +8,6 @@ Usage: python build_site.py [--n 24]
 import argparse
 import json
 import os
-import re
 
 import pandas as pd
 
@@ -17,26 +16,20 @@ from race_tv import build, OUT, DATA
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 
-def target_of(desc):
-    m = re.search(r"pass .*?to ([A-Z][A-Za-z'\-]*\.\s?[A-Za-z'\-\.]+)", str(desc))
-    return m.group(1).replace(" ", "").lower() if m else None
-
-
 def pick_plays(n):
     r = pd.read_csv(os.path.join(OUT, "race_routes.csv"))
-    r["short"] = r.displayName.map(lambda s: f"{s.split()[0][0]}.{s.split()[-1]}".lower())
-    r["tgt"] = r.playDescription.map(target_of)
+    r["is_target"] = r.targeted.fillna(False).astype(bool)      # nflverse, by player ID (compute_race.py)
     r["yds"] = r.playDescription.str.extract(r"for (-?\d+) yards").astype(float)
     r["td"] = r.playDescription.str.contains("TOUCHDOWN")
     have = {int(f.split("_")[1].split(".")[0]) for f in os.listdir(os.path.join(DATA, "tracking"))}
     p = r[r.pressured & r.gameId.isin(have) & ~r.playDescription.str.contains("No Play|PENALTY", regex=True)]
 
     # A) target won the race, completed, long gain
-    a = p[(p.tgt == p.short) & p.won & p.passResult.eq("C") & p.officialPosition.isin(["WR", "TE"])]
+    a = p[p.is_target & p.won & p.passResult.eq("C") & p.officialPosition.isin(["WR", "TE"])]
     a = a.sort_values(["td", "yds"], ascending=False).drop_duplicates(["gameId", "playId"]).head(n // 2)
     # B) open man ignored: someone won by >= 0.5s, target did not win, incomplete
     plays_won = p[p.won & (p.margin >= 0.5)][["gameId", "playId"]].drop_duplicates()
-    b = p[(p.tgt == p.short) & ~p.won & p.passResult.eq("I")].merge(plays_won, on=["gameId", "playId"])
+    b = p[p.is_target & ~p.won & p.passResult.eq("I")].merge(plays_won, on=["gameId", "playId"])
     b = b.drop_duplicates(["gameId", "playId"]).sample(min(len(b), n // 4), random_state=3)
     # C) sacks where nobody won
     plays_nowin = p.groupby(["gameId", "playId"]).won.sum().rename("w").reset_index()
@@ -89,17 +82,17 @@ canvas{width:100%;height:auto;display:block;background:#1d4d2b;max-height:62vh;o
 <p>Two clocks start at the snap. The red one measures how long until a pass rusher gets within 2 yards of the quarterback. Each green one measures how long until that receiver has 3 yards of separation from the nearest defender after travelling 5 yards from where he lined up, so the cushion he was given before the snap doesn't count. The gold tick is the throw. A receiver wins when his clock beats the red one.</p>
 <p>Plays in the menu are grouped: receivers who won the race and were thrown to; plays where someone won by half a second or more but the ball went elsewhere; and sacks where nobody won.</p>
 <h2>Why it matters</h2>
-<p>On 1,290 pressured dropbacks where the target can be read from the play description, throws to a receiver who had already won his race were completed 73% of the time; throws to one who hadn't, 60%. Holding route depth fixed, the gap is 77% vs 61% on short passes and nearly nothing on deep ones. Sack rate on pressured dropbacks is 30% when no receiver wins and 17% when one wins by more than a second.</p>
-<p>We also checked whether the race adds anything a separation stat does not. In a logistic regression on the same passes, separation at the throw is the strongest predictor of completion and the race margin adds nothing on top of it. We think that is the right result: the race is the same information measured earlier and attributed to a player and a moment, not a new predictor. The thresholds (2, 3 and 5 yards) move the levels but not the story; the sack-rate gap holds at every setting we tried, the completion gap shrinks when the pressure radius is tightened. Details in <span class="k">output/model_results.csv</span> and <span class="k">output/robustness.csv</span>.</p>
+<p>On 1,593 pressured, targeted passes (target identified by player ID from nflverse, interceptions included), throws to a receiver who had already won his race were completed 57% of the time; throws to one who hadn't, 48%. By CPOE, which already accounts for air yards and situation, that is 6.4 points above expected, and both groups throw the same distance (11.0 vs 10.8 air yards). The gap lives on short passes (62% vs 49%) and disappears on deep ones (43% vs 45%). Sack rate on pressured dropbacks is 30% when no receiver wins and 17% when one wins by more than a second.</p>
+<p>We also checked whether the race adds anything a separation stat does not. In a logistic regression on the same passes, separation at the throw is the strongest predictor of completion and the race margin adds nothing on top of it; on top of nflverse's public expected-completion model it adds almost nothing (AUC 0.651 to 0.654). We think that is the right result: the race is the same information measured earlier and attributed to a player and a moment, not a new predictor. It is also not value: across receivers, win rate under pressure barely correlates with EPA per target (r = +0.07) or with NGS average separation (r = +0.03). The thresholds (2, 3 and 5 yards) move the levels; the sack-rate gap holds at every setting we tried, the completion gap shrinks or reverses when the pressure radius is tightened. Details in <span class="k">output/model_results.csv</span> and <span class="k">output/robustness.csv</span>.</p>
 <table><tr><th>Pressured dropbacks</th><th>Pocket breaks (median)</th><th>First receiver open (median)</th><th>WR / TE / RB already open when it breaks</th></tr>
-<tr><td>2,649</td><td>2.7 s</td><td>1.6 s</td><td>63% / 57% / 71%</td></tr></table>
+<tr><td>2,660</td><td>2.7 s</td><td>1.6 s</td><td>63% / 57% / 71%</td></tr></table>
 <h2>Who wins the race</h2>
 <p>Baltimore's receivers, by a distance: Marquise Brown wins 86% of his pressured routes, Devin Duvernay 83%, James Proche 82%, Mark Andrews 77%. The quick game shows up in the numbers. At the other end sit Davante Adams (40%) and Ja'Marr Chase (41%), because deep routes come open after the pocket has already broken. This is a measure of who gives the quarterback an early answer, not of who the best receiver is.</p>
 <h2>For coaches</h2>
 <p>Keeping a back or tight end in to block is supposed to buy time. Against man coverage it doesn't: one extra blocker leaves the pocket clock at 2.5 s (2.6 s with none) and drops the share of plays with someone open in time from 88% to 83%. Against zone, two extra blockers buy 0.6 s. The per-team numbers are in <span class="k">output/protection_exchange.csv</span>; every defense's pocket clock and completion allowed by coverage call is in <span class="k">output/defense_cards.csv</span>.</p>
-<div class="imgs"><img src="output/chart_validation_target.png" alt=""><img src="output/chart_receivers.png" alt=""><img src="output/chart_protection.png" alt=""><img src="output/chart_teams.png" alt=""></div>
+<div class="imgs"><img src="output/chart_validation_target.png" alt=""><img src="output/chart_receivers.png" alt=""><img src="output/chart_value.png" alt=""><img src="output/chart_protection.png" alt=""><img src="output/chart_teams.png" alt=""></div>
 <h2>Method, limits, code</h2>
-<p>Python with pandas, numpy and matplotlib; everything runs from the public Big Data Bowl files. The target is parsed from the play text, so interceptions (worded differently) are left out of the validation. Matchups are the nearest defender; PFF does not label assignments. Thresholds are football-reasonable, not tuned. Tracking stops at the throw, so this describes the race up to the release and says nothing about the catch. See the <a href="README.md">README</a> and <span class="k">compute_race.py</span>, <span class="k">team_report.py</span>, <span class="k">race_tv.py</span>.</p>
+<p>Python with pandas, numpy and matplotlib; everything runs from the public Big Data Bowl files plus free nflverse play-by-play (EPA, win probability, air yards, CPOE, targeted receiver), joined on game and play ID. The EPA and win-probability numbers shown for each play come from nflverse's models. Matchups are the nearest defender; PFF does not label assignments. Thresholds are football-reasonable, not tuned. Tracking stops at the throw, so this describes the race up to the release and says nothing about the catch. See the <a href="README.md">README</a> and <span class="k">compute_race.py</span>, <span class="k">team_report.py</span>, <span class="k">race_tv.py</span>.</p>
 </div>
 
 <script>
@@ -121,7 +114,7 @@ function load(i) {
   D.receivers.forEach(r => { r.tOpen = null; for (let j = minK; j <= endK; j++) if (r.sep[j] >= TH.open && r.moved[j] >= TH.route) { r.tOpen = t(j); break; } });
   D.receivers.sort((a, b) => (a.tOpen ?? 99) - (b.tOpen ?? 99));
   tEnd = t(endK); maxT = Math.max(3.5, tEnd + 0.3);
-  document.getElementById('sit').textContent = D.title.replace(/\s+·\s+/g, ' · ') + ' · ' + D.situation;
+  document.getElementById('sit').textContent = D.title.replace(/\s+·\s+/g, ' · ') + ' · ' + D.situation + (D.value ? ' · ' + D.value.replace(/\s+·\s+/g, ' · ') : '');
   document.getElementById('desc').textContent = D.desc;
   const R = document.getElementById('rows'); R.innerHTML = '';
   const row = (cls, label) => { const el = document.createElement('div'); el.className = 'row ' + cls; el.innerHTML = `<div>${label}</div><div class="trk"><i></i><span class="tick" style="left:${100 * tEnd / maxT}%"></span></div><div class="t">—</div>`; R.appendChild(el); return el; };

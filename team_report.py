@@ -52,7 +52,8 @@ def load():
                   t_pressure=("t_pressure", "first"), play_len=("play_len", "first"),
                   n_routes=("nflId", "size"),
                   t_first_open=("t_open", "min"),
-                  n_open_in_time=("won", "sum"))
+                  n_open_in_time=("won", "sum"),
+                  epa=("epa", "first"))
              .reset_index())
     plays = plays.join(xb, on=["gameId", "playId"]).join(rushers, on=["gameId", "playId"])
     plays["extra_blockers"] = plays.extra_blockers.fillna(0).astype(int).clip(upper=2)   # 0, 1, 2+
@@ -66,39 +67,59 @@ def load():
     return plays
 
 
-import re
+DEEP_AIR_YARDS = 15     # nflverse air_yards >= 15 = deep pass
+
+
 def target_validation(routes):
-    """Receiver-level test: did the receiver the QB actually threw to win HIS race?  Pressured, targeted passes only."""
-    r = routes[routes.pressured & routes.passResult.isin(["C", "I", "IN"])].copy()
-    def target_name(desc):
-        m = re.search(r"pass .*?to ([A-Z][A-Za-z'\-]*\.\s?[A-Za-z'\-\.]+)", str(desc))
-        return m.group(1).replace(" ", "") if m else None
-    r["tgt"] = r.playDescription.map(target_name)
-    r["short"] = r.displayName.map(lambda n: f"{n.split()[0][0]}.{n.replace(' Jr.', '').replace(' III', '').replace(' II', '').split()[-1]}")
-    r = r[r.tgt.notna() & (r.tgt.str.lower() == r.short.str.lower())]           # keep the targeted receiver's row
-    r = r.drop_duplicates(["gameId", "playId"])
+    """Receiver-level test: did the receiver the QB actually threw to win HIS race?  Pressured, targeted passes only.
+    The target comes from nflverse by player ID (`targeted`, set in compute_race.py), so incompletions and
+    interceptions are included. Value per target: EPA, and CPOE = completion % above nflverse's expected
+    completion, which already accounts for air yards, pass location and situation."""
+    r = routes[routes.pressured & routes.passResult.isin(["C", "I", "IN"]) & routes.targeted.fillna(False).astype(bool)]
+    r = r.drop_duplicates(["gameId", "playId"]).copy()
     r["complete"] = r.passResult.eq("C")
-    out = []
-    for lab, d in [("target was open before pocket broke", r[r.won]), ("target was NOT open in time", r[~r.won])]:
-        out.append(dict(outcome=lab, targets=len(d), p_complete=d.complete.mean(), p_int=d.passResult.eq("IN").mean(),
-                        yards_when_complete=d.loc[d.complete, "yards"].mean()))
+    r["depth"] = np.where(r.air_yards >= DEEP_AIR_YARDS, "deep", "short")
+
+    def row(lab, d):
+        return dict(outcome=lab, targets=len(d), p_complete=d.complete.mean(), p_int=d.passResult.eq("IN").mean(),
+                    epa_per_target=d.epa.mean(), cpoe=d.cpoe.mean(), success_rate=d.success.mean(),
+                    air_yards=d.air_yards.mean(), yards_when_complete=d.loc[d.complete, "yards"].mean())
+    out = [row("target was open before pocket broke", r[r.won]), row("target was NOT open in time", r[~r.won])]
+    for dep in ["short", "deep"]:
+        for lab, d in [("won", r[r.won]), ("lost", r[~r.won])]:
+            out.append(row(f"{dep} pass (air yards {'<' if dep == 'short' else '>='} {DEEP_AIR_YARDS}): target {lab}", d[d.depth == dep]))
     r["margin_bin"] = pd.cut(r.margin, [-9, -0.01, 0.3, 0.6, 1.0, 9], labels=["lost", "<0.3s", "0.3-0.6s", "0.6-1.0s", ">1.0s"])
     for b, d in r.groupby("margin_bin", observed=True):
-        out.append(dict(outcome=f"target margin: {b}", targets=len(d), p_complete=d.complete.mean(), p_int=d.passResult.eq("IN").mean(),
-                        yards_when_complete=d.loc[d.complete, "yards"].mean()))
+        out.append(row(f"target margin: {b}", d))
     v = pd.DataFrame(out)
     v.to_csv(os.path.join(OUT, "validation_target.csv"), index=False)
-    d = v.iloc[:2].copy(); d["lab"] = ["target WON the race\n(open before pocket broke)", "target LOST the race\n(not open in time)"]
-    fig, ax = plt.subplots(figsize=(7.5, 4.8), dpi=160)
-    bars = ax.bar(d.lab, 100 * d.p_complete, color=["#2a9d6f", "#c0392b"], width=.55)
-    for b_, r_ in zip(bars, d.itertuples()):
-        ax.text(b_.get_x() + b_.get_width() / 2, b_.get_height() + 1.5, f"{100*r_.p_complete:.0f}%", ha="center", fontsize=16, fontweight="bold", color=INK)
-        ax.text(b_.get_x() + b_.get_width() / 2, 4, f"n={r_.targets} targets", ha="center", fontsize=9, color="white")
-    ax.set_ylim(0, 90); ax.grid(axis="x", visible=False)
-    ax.set_ylabel("completion probability (%)")
-    ax.set_title("Throw to the receiver who won the race: +12 pts completion", loc="left", fontsize=13, fontweight="bold", color=INK, pad=18)
-    ax.text(0, 1.02, "Pressured, targeted passes, 2021 wks 1-8. Target parsed from the play description; interceptions excluded.", transform=ax.transAxes, color=MUTED, fontsize=9)
-    fig.tight_layout(); fig.savefig(os.path.join(OUT, "chart_validation_target.png")); plt.close(fig)
+
+    # chart: completion % and completion above expected (CPOE), won vs lost, all / short / deep
+    groups = [("all targets", r), (f"short (<{DEEP_AIR_YARDS} air yds)", r[r.depth == "short"]),
+              (f"deep ({DEEP_AIR_YARDS}+ air yds)", r[r.depth == "deep"])]
+    fig, axes = plt.subplots(1, 2, figsize=(11, 4.8), dpi=160)
+    x = np.arange(len(groups)); w = .38
+    for ax, col, scale, ylab in [(axes[0], "complete", 100, "completion (%)"),
+                                 (axes[1], "cpoe", 1, "completion above expected, CPOE (pts)")]:
+        for j, (won, c, lab) in enumerate([(True, "#2a9d6f", "target WON the race"), (False, "#c0392b", "target LOST the race")]):
+            vals = [scale * d.loc[d.won == won, col].mean() for _, d in groups]
+            ns = [int((d.won == won).sum()) for _, d in groups]
+            bars = ax.bar(x + (j - .5) * w, vals, w, color=c, label=lab)
+            for b_, v_ in zip(bars, vals):
+                va = "bottom" if v_ >= 0 else "top"
+                ax.text(b_.get_x() + b_.get_width() / 2, v_ + (1 if v_ >= 0 else -1), f"{v_:+.1f}" if col == "cpoe" else f"{v_:.0f}%",
+                        ha="center", va=va, fontsize=9, fontweight="bold", color=INK)
+        ticks = [f"{g}\nn = {int(d.won.sum())} won / {int((~d.won).sum())} lost" for g, d in groups]
+        ax.set_xticks(x, ticks, fontsize=8.5); ax.set_ylabel(ylab); ax.grid(axis="x", visible=False)
+        ax.axhline(0, color=INK, lw=.8)
+    axes[0].set_ylim(0, 80); axes[1].set_ylim(-20, 10)
+    axes[0].legend(frameon=False, loc="upper right", fontsize=8.5)
+    a, l = r[r.won], r[~r.won]
+    fig.suptitle(f"Throw to the receiver who won the race: {100*a.complete.mean():.0f}% vs {100*l.complete.mean():.0f}% completion, "
+                 f"{a.cpoe.mean() - l.cpoe.mean():+.1f} pts above expected", x=.01, ha="left", fontsize=13, fontweight="bold", color=INK)
+    fig.text(.01, .9, f"Pressured, targeted passes incl. interceptions, 2021 wks 1-8 (n={len(r):,}). Target and CPOE from nflverse. "
+             f"Air yards: {a.air_yards.mean():.1f} won vs {l.air_yards.mean():.1f} lost.", color=MUTED, fontsize=9)
+    fig.tight_layout(rect=(0, 0, 1, .88)); fig.savefig(os.path.join(OUT, "chart_validation_target.png")); plt.close(fig)
     return v
 
 
@@ -110,14 +131,16 @@ def validation(plays):
                      ("race lost (nobody open in time)", p[~p.race_won])]:
         rows.append(dict(outcome=label, dropbacks=len(d), p_complete=d.complete.mean(), p_sack=d.sack.mean(),
                          p_int=d.passResult.eq("IN").mean(), yards_per_play=d.yards.mean(),
-                         success_rate=(d.yards >= np.where(d.down >= 3, d.ytg, np.maximum(4, 0.5 * d.ytg))).mean()))
+                         success_rate=(d.yards >= np.where(d.down >= 3, d.ytg, np.maximum(4, 0.5 * d.ytg))).mean(),
+                         epa_per_dropback=d.epa.mean()))
     # by margin bins: how much time to spare
     p["margin_bin"] = pd.cut(p.margin, [-9, -0.01, 0.3, 0.6, 1.0, 9],
                              labels=["lost", "won by <0.3s", "0.3-0.6s", "0.6-1.0s", ">1.0s"])
     for b, d in p.groupby("margin_bin", observed=True):
         rows.append(dict(outcome=f"margin: {b}", dropbacks=len(d), p_complete=d.complete.mean(), p_sack=d.sack.mean(),
                          p_int=d.passResult.eq("IN").mean(), yards_per_play=d.yards.mean(),
-                         success_rate=(d.yards >= np.where(d.down >= 3, d.ytg, np.maximum(4, 0.5 * d.ytg))).mean()))
+                         success_rate=(d.yards >= np.where(d.down >= 3, d.ytg, np.maximum(4, 0.5 * d.ytg))).mean(),
+                         epa_per_dropback=d.epa.mean()))
     v = pd.DataFrame(rows)
     v.to_csv(os.path.join(OUT, "validation.csv"), index=False)
 
@@ -149,17 +172,18 @@ def protection_exchange(plays):
                               pocket_clock=d.pocket_clock.median(), receivers=d.n_routes.mean(),
                               first_open=d.t_first_open.median(), open_in_time=d.n_open_in_time.mean(),
                               race_won=d.race_won.mean(), completion=d.complete.mean(), sack=d.sack.mean(),
-                              yards=d.yards.mean()))
+                              yards=d.yards.mean(), epa=d.epa.mean()))
     league = plays.groupby(["cov_type", "extra_blockers"]).apply(agg, include_groups=False).reset_index()
     league.insert(0, "offense", "LEAGUE")
     teams = plays.groupby(["offense", "cov_type", "extra_blockers"]).apply(agg, include_groups=False).reset_index()
     ex = pd.concat([league, teams], ignore_index=True)
     # exchange rate vs 5-man protection (0 extra) in the same coverage type
     base = ex[ex.extra_blockers == 0].set_index(["offense", "cov_type"])
-    ex = ex.join(base[["pocket_clock", "first_open", "race_won", "completion"]].add_prefix("base_"), on=["offense", "cov_type"])
+    ex = ex.join(base[["pocket_clock", "first_open", "race_won", "completion", "epa"]].add_prefix("base_"), on=["offense", "cov_type"])
     ex["time_bought_s"] = ex.pocket_clock - ex.base_pocket_clock
     ex["route_clock_cost_s"] = ex.first_open - ex.base_first_open
     ex["race_won_change"] = ex.race_won - ex.base_race_won
+    ex["epa_change"] = ex.epa - ex.base_epa
     ex = ex[ex.dropbacks >= 10]
     ex.to_csv(os.path.join(OUT, "protection_exchange.csv"), index=False)
 
@@ -190,7 +214,8 @@ def defense_cards(plays):
     def agg(d):
         return pd.Series(dict(dropbacks=len(d), pressure_rate=d.pressured.mean(), pocket_clock=d.t_pressure.median(),
                               first_open=d.t_first_open.median(), race_won_allowed=d.race_won.mean(),
-                              completion_allowed=d.complete.mean(), sack_rate=d.sack.mean()))
+                              completion_allowed=d.complete.mean(), sack_rate=d.sack.mean(),
+                              epa_allowed=d.epa.mean()))
     overall = plays.groupby("defense").apply(agg, include_groups=False).reset_index()
     overall.insert(1, "coverage", "ALL")
     bycov = plays.groupby(["defense", "coverage"]).apply(agg, include_groups=False).reset_index()
@@ -205,11 +230,12 @@ def print_card(team, ex, cards, plays):
     print(f"\n==== RACE CARD: {team} ====")
     print("\nOFFENSE - protection exchange (vs 5-man protection in same coverage):")
     t = ex[(ex.offense == team)][["cov_type", "extra_blockers", "dropbacks", "pocket_clock", "first_open",
-                                  "race_won", "completion", "time_bought_s", "route_clock_cost_s", "race_won_change"]]
+                                  "race_won", "completion", "epa", "time_bought_s", "route_clock_cost_s", "race_won_change",
+                                  "epa_change"]]
     print(t.round(2).to_string(index=False))
     print("\nDEFENSE - what opponents face:")
     d = cards[cards.defense == team][["coverage", "dropbacks", "pressure_rate", "pocket_clock", "first_open",
-                                      "race_won_allowed", "completion_allowed", "sack_rate"]]
+                                      "race_won_allowed", "completion_allowed", "sack_rate", "epa_allowed"]]
     print(d.round(2).to_string(index=False))
     print(f"\nLeague: pressure {lg.pressured.mean():.0%}, pocket clock {lg.t_pressure.median():.1f}s, "
           f"first open {lg.t_first_open.median():.1f}s, race won {lg.race_won.mean():.0%}")
