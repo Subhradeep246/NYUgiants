@@ -1,4 +1,4 @@
-# THE RACE — Pocket Clock vs. Route Clock
+# THE RACE — Pocket Clock vs. Route Clock.
 
 > **Site:** `index.html` is the viewer itself — 24 plays (race won, open man not thrown to, sacks) with the two clocks, a play picker and the findings underneath. Single-play mocks are in `output/race_tv_*.html`.
 
